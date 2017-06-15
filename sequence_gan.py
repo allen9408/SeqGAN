@@ -6,19 +6,20 @@ from generator import Generator
 from discriminator import Discriminator
 from rollout import ROLLOUT
 from target_lstm import TARGET_LSTM
-import cPickle
+import pickle
 
 #########################################################################################
 #  Generator  Hyper-parameters
 ######################################################################################
 EMB_DIM = 32 # embedding dimension
 HIDDEN_DIM = 32 # hidden state dimension of lstm cell
-SEQ_LENGTH = 20 # sequence length
+# SEQ_LENGTH = 20 # sequence length
+SEQ_LENGTH = 253 # sequence length
 START_TOKEN = 0
 PRE_EPOCH_NUM = 120 # supervise (maximum likelihood estimation) epochs
 SEED = 88
-BATCH_SIZE = 64
-
+# BATCH_SIZE = 64
+BATCH_SIZE = 4
 #########################################################################################
 #  Discriminator  Hyper-parameters
 #########################################################################################
@@ -27,17 +28,19 @@ dis_filter_sizes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20]
 dis_num_filters = [100, 200, 200, 200, 200, 100, 100, 100, 100, 100, 160, 160]
 dis_dropout_keep_prob = 0.75
 dis_l2_reg_lambda = 0.2
-dis_batch_size = 64
-
+# dis_batch_size = 64
+BATCH_SIZE = 4
 #########################################################################################
 #  Basic Training Parameters
 #########################################################################################
-TOTAL_BATCH = 200
-positive_file = 'save/real_data.txt'
+# TOTAL_BATCH = 200
+TOTAL_BATCH = 50
+# positive_file = 'save/real_data.txt'
+positive_file = 'save/real_sequence.txt'
 negative_file = 'save/generator_sample.txt'
 eval_file = 'save/eval_file.txt'
-generated_num = 10000
-
+# generated_num = 10000
+generated_num = 100
 
 def generate_samples(sess, trainable_model, batch_size, generated_num, output_file):
     # Generate Samples
@@ -57,7 +60,7 @@ def target_loss(sess, target_lstm, data_loader):
     nll = []
     data_loader.reset_pointer()
 
-    for it in xrange(data_loader.num_batch):
+    for it in range(data_loader.num_batch):
         batch = data_loader.next_batch()
         g_loss = sess.run(target_lstm.pretrain_loss, {target_lstm.x: batch})
         nll.append(g_loss)
@@ -70,7 +73,7 @@ def pre_train_epoch(sess, trainable_model, data_loader):
     supervised_g_losses = []
     data_loader.reset_pointer()
 
-    for it in xrange(data_loader.num_batch):
+    for it in range(data_loader.num_batch):
         batch = data_loader.next_batch()
         _, g_loss = trainable_model.pretrain_step(sess, batch)
         supervised_g_losses.append(g_loss)
@@ -85,14 +88,18 @@ def main():
 
     gen_data_loader = Gen_Data_loader(BATCH_SIZE)
     likelihood_data_loader = Gen_Data_loader(BATCH_SIZE) # For testing
+    # vocab_size = 5000
     vocab_size = 5000
     dis_data_loader = Dis_dataloader(BATCH_SIZE)
 
     generator = Generator(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN)
-    target_params = cPickle.load(open('save/target_params.pkl'))
+    # target_params = pickle.load(open('save/target_params.pkl'))
+    target_params = pickle.load(open('save/target_params.pkl', 'rb'), encoding='latin1')
     target_lstm = TARGET_LSTM(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN, target_params) # The oracle model
 
-    discriminator = Discriminator(sequence_length=20, num_classes=2, vocab_size=vocab_size, embedding_size=dis_embedding_dim, 
+    # discriminator = Discriminator(sequence_length=20, num_classes=2, vocab_size=vocab_size, embedding_size=dis_embedding_dim, 
+    #                             filter_sizes=dis_filter_sizes, num_filters=dis_num_filters, l2_reg_lambda=dis_l2_reg_lambda)
+    discriminator = Discriminator(sequence_length=253, num_classes=2, vocab_size=vocab_size, embedding_size=dis_embedding_dim, 
                                 filter_sizes=dis_filter_sizes, num_filters=dis_num_filters, l2_reg_lambda=dis_l2_reg_lambda)
 
     config = tf.ConfigProto()
@@ -101,31 +108,31 @@ def main():
     sess.run(tf.global_variables_initializer())
 
     # First, use the oracle model to provide the positive examples, which are sampled from the oracle data distribution
-    generate_samples(sess, target_lstm, BATCH_SIZE, generated_num, positive_file)
+    # generate_samples(sess, target_lstm, BATCH_SIZE, generated_num, positive_file)
     gen_data_loader.create_batches(positive_file)
 
     log = open('save/experiment-log.txt', 'w')
     #  pre-train generator
-    print 'Start pre-training...'
+    print('Start pre-training...')
     log.write('pre-training...\n')
-    for epoch in xrange(PRE_EPOCH_NUM):
+    for epoch in range(PRE_EPOCH_NUM):
         loss = pre_train_epoch(sess, generator, gen_data_loader)
         if epoch % 5 == 0:
             generate_samples(sess, generator, BATCH_SIZE, generated_num, eval_file)
             likelihood_data_loader.create_batches(eval_file)
             test_loss = target_loss(sess, target_lstm, likelihood_data_loader)
-            print 'pre-train epoch ', epoch, 'test_loss ', test_loss
+            print('pre-train epoch ', epoch, 'test_loss ', test_loss)
             buffer = 'epoch:\t'+ str(epoch) + '\tnll:\t' + str(test_loss) + '\n'
             log.write(buffer)
 
-    print 'Start pre-training discriminator...'
+    print('Start pre-training discriminator...')
     # Train 3 epoch on the generated data and do this for 50 times
     for _ in range(50):
         generate_samples(sess, generator, BATCH_SIZE, generated_num, negative_file)
         dis_data_loader.load_train_data(positive_file, negative_file)
         for _ in range(3):
             dis_data_loader.reset_pointer()
-            for it in xrange(dis_data_loader.num_batch):
+            for it in range(dis_data_loader.num_batch):
                 x_batch, y_batch = dis_data_loader.next_batch()
                 feed = {
                     discriminator.input_x: x_batch,
@@ -136,8 +143,8 @@ def main():
 
     rollout = ROLLOUT(generator, 0.8)
 
-    print '#########################################################################'
-    print 'Start Adversarial Training...'
+    print('#########################################################################')
+    print('Start Adversarial Training...')
     log.write('adversarial training...\n')
     for total_batch in range(TOTAL_BATCH):
         # Train the generator for one step
@@ -153,7 +160,7 @@ def main():
             likelihood_data_loader.create_batches(eval_file)
             test_loss = target_loss(sess, target_lstm, likelihood_data_loader)
             buffer = 'epoch:\t' + str(total_batch) + '\tnll:\t' + str(test_loss) + '\n'
-            print 'total_batch: ', total_batch, 'test_loss: ', test_loss
+            print('total_batch: ', total_batch, 'test_loss: ', test_loss)
             log.write(buffer)
 
         # Update roll-out parameters
@@ -166,7 +173,7 @@ def main():
 
             for _ in range(3):
                 dis_data_loader.reset_pointer()
-                for it in xrange(dis_data_loader.num_batch):
+                for it in range(dis_data_loader.num_batch):
                     x_batch, y_batch = dis_data_loader.next_batch()
                     feed = {
                         discriminator.input_x: x_batch,

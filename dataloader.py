@@ -13,10 +13,12 @@ class Gen_Data_loader():
                 line = line.strip()
                 line = line.split()
                 parse_line = [int(x) for x in line]
-                if len(parse_line) == 20:
+                # if len(parse_line) == 20:
+                if len(parse_line) == 253:
                     self.token_stream.append(parse_line)
 
         self.num_batch = int(len(self.token_stream) / self.batch_size)
+        print('token size = ', len(self.token_stream))
         self.token_stream = self.token_stream[:self.num_batch * self.batch_size]
         self.sequence_batch = np.split(np.array(self.token_stream), self.num_batch, 0)
         self.pointer = 0
