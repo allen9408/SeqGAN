@@ -58,19 +58,7 @@ def main():
 		data.append(gen_seq)
 		count+=1
 	Dis_dataloader.write_train_data(data)
-
-
-
-
-
-	# for each in data:
-	# 	tmp_1 = each 
-	# 	tmp_2 = each
-	# 	last = each.index(100)
-	# 	tmp[100-1] = 100
-	# 	tmp[100] = 4999
-	# 	generate_data.append(tmp)
-	# data.extend(generate_data)
+	print (len(data))
 
 if __name__ == '__main__':
     main()
