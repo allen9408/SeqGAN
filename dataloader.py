@@ -86,3 +86,13 @@ class Dis_dataloader():
     def reset_pointer(self):
         self.pointer = 0
 
+    def write_train_data(seq_list):
+        text_file = open("save/Generate_Train_Set.txt", "w")
+        for eachline in seq_list:
+            for each in eachline:
+                text_file.write("%d " % each)
+            text_file.write("\n")
+        text_file.close()
+
+
+

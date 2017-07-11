@@ -110,7 +110,8 @@ def main():
     # First, use the oracle model to provide the positive examples, which are sampled from the oracle data distribution
     # generate_samples(sess, target_lstm, BATCH_SIZE, generated_num, positive_file)
     gen_data_loader.create_batches(positive_file)
-
+    print (gen_data_loader.token_stream)
+    input()
     log = open('save/experiment-log.txt', 'w')
     #  pre-train generator
     print('Start pre-training...')
@@ -143,7 +144,7 @@ def main():
                 _ = sess.run(discriminator.train_op, feed)
 
     rollout = ROLLOUT(generator, 0.8)
-
+    
     print('#########################################################################')
     print('Start Adversarial Training...')
     log.write('adversarial training...\n')
