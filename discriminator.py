@@ -69,7 +69,7 @@ class Discriminator(object):
         with tf.variable_scope('discriminator'):
 
             # Embedding layer
-            with tf.device('/cpu:0'), tf.name_scope("embedding"):
+            with tf.name_scope("embedding"):
                 self.W = tf.Variable(
                     tf.random_uniform([vocab_size, embedding_size], -1.0, 1.0),
                     name="W")

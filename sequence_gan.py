@@ -5,18 +5,21 @@ from dataloader import Gen_Data_loader, Dis_dataloader
 from generator import Generator
 from discriminator import Discriminator
 from rollout import ROLLOUT
-from target_lstm import TARGET_LSTM
+# from target_lstm import TARGET_LSTM
+from target_lstm_new import TARGET_LSTM
 import pickle
+import pdb
 
 #########################################################################################
 #  Generator  Hyper-parameters
 ######################################################################################
 EMB_DIM = 32 # embedding dimension
 HIDDEN_DIM = 32 # hidden state dimension of lstm cell
-# SEQ_LENGTH = 20 # sequence length
-SEQ_LENGTH = 253 # sequence length
+SEQ_LENGTH = 22 # sequence length
+# SEQ_LENGTH = 253 # sequence length
 START_TOKEN = 0
-PRE_EPOCH_NUM = 120 # supervise (maximum likelihood estimation) epochs
+# PRE_EPOCH_NUM = 120 # supervise (maximum likelihood estimation) epochs
+PRE_EPOCH_NUM = 12 # supervise (maximum likelihood estimation) epochs
 SEED = 88
 # BATCH_SIZE = 64
 BATCH_SIZE = 4
@@ -35,8 +38,9 @@ BATCH_SIZE = 4
 #########################################################################################
 # TOTAL_BATCH = 200
 TOTAL_BATCH = 50
-# positive_file = 'save/real_data.txt'
-positive_file = 'save/real_sequence.txt'
+positive_file = 'save/intubation_idx.txt'
+# positive_file = 'save/real_sequence.txt'
+
 negative_file = 'save/generator_sample.txt'
 eval_file = 'save/eval_file.txt'
 # generated_num = 10000
@@ -75,6 +79,7 @@ def pre_train_epoch(sess, trainable_model, data_loader):
 
     for it in range(data_loader.num_batch):
         batch = data_loader.next_batch()
+        # pdb.set_trace()
         _, g_loss = trainable_model.pretrain_step(sess, batch)
         supervised_g_losses.append(g_loss)
 
@@ -86,26 +91,38 @@ def main():
     np.random.seed(SEED)
     assert START_TOKEN == 0
 
-    gen_data_loader = Gen_Data_loader(BATCH_SIZE)
-    likelihood_data_loader = Gen_Data_loader(BATCH_SIZE) # For testing
+    gen_data_loader = Gen_Data_loader(BATCH_SIZE, SEQ_LENGTH)
+    likelihood_data_loader = Gen_Data_loader(BATCH_SIZE, SEQ_LENGTH) # For testing
     # vocab_size = 5000
-    vocab_size = 5000
-    dis_data_loader = Dis_dataloader(BATCH_SIZE)
+    vocab_size = 102
+    dis_data_loader = Dis_dataloader(BATCH_SIZE, SEQ_LENGTH)
 
     generator = Generator(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN)
     # target_params = pickle.load(open('save/target_params.pkl'))
     target_params = pickle.load(open('save/target_params.pkl', 'rb'), encoding='latin1')
-    target_lstm = TARGET_LSTM(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN, target_params) # The oracle model
+    # target_lstm = TARGET_LSTM(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN, target_params) # The oracle model
+    target_lstm = TARGET_LSTM(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN) # The oracle model
 
     # discriminator = Discriminator(sequence_length=20, num_classes=2, vocab_size=vocab_size, embedding_size=dis_embedding_dim, 
     #                             filter_sizes=dis_filter_sizes, num_filters=dis_num_filters, l2_reg_lambda=dis_l2_reg_lambda)
-    discriminator = Discriminator(sequence_length=253, num_classes=2, vocab_size=vocab_size, embedding_size=dis_embedding_dim, 
+    discriminator = Discriminator(sequence_length=SEQ_LENGTH, num_classes=2, vocab_size=vocab_size, embedding_size=dis_embedding_dim, 
                                 filter_sizes=dis_filter_sizes, num_filters=dis_num_filters, l2_reg_lambda=dis_l2_reg_lambda)
 
+    # config = tf.ConfigProto()
+    # config.gpu_options.allow_growth = True
+    # sess = tf.Session(config=config)
+    # sess.run(tf.global_variables_initializer())
     config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
+    # config.gpu_options.allow_growth = True
     sess = tf.Session(config=config)
     sess.run(tf.global_variables_initializer())
+    gen_data_loader.create_batches(positive_file)
+
+    print("Pre-train target lstm")
+    # for i in range(100):
+    for i in range(10):
+        loss = pre_train_epoch(sess, target_lstm, gen_data_loader)
+        print(i, 'th epoch, pretrain_loss = ', loss)
 
     # First, use the oracle model to provide the positive examples, which are sampled from the oracle data distribution
     # generate_samples(sess, target_lstm, BATCH_SIZE, generated_num, positive_file)
@@ -134,11 +151,7 @@ def main():
             dis_data_loader.reset_pointer()
             for it in range(dis_data_loader.num_batch):
                 x_batch, y_batch = dis_data_loader.next_batch()
-                feed = {
-                    discriminator.input_x: x_batch,
-                    discriminator.input_y: y_batch,
-                    discriminator.dropout_keep_prob: dis_dropout_keep_prob
-                }
+                feed = {discriminator.input_x: x_batch,discriminator.input_y: y_batch,discriminator.dropout_keep_prob: dis_dropout_keep_prob}
                 _ = sess.run(discriminator.train_op, feed)
 
     rollout = ROLLOUT(generator, 0.8)
@@ -155,7 +168,7 @@ def main():
             _ = sess.run(generator.g_updates, feed_dict=feed)
 
         # Test
-        if total_batch % 5 == 0 or total_batch == TOTAL_BATCH - 1:
+        if total_batch % 2 == 0 or total_batch == TOTAL_BATCH - 1:
             generate_samples(sess, generator, BATCH_SIZE, generated_num, eval_file)
             likelihood_data_loader.create_batches(eval_file)
             test_loss = target_loss(sess, target_lstm, likelihood_data_loader)
