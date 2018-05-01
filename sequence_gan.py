@@ -196,6 +196,7 @@ def main():
                     _ = sess.run(discriminator.train_op, feed)
 
     log.close()
+    generate_samples(sess, generator, BATCH_SIZE, generated_num, 'Generate.txt')
 
 
 if __name__ == '__main__':
