@@ -1,6 +1,16 @@
 # SeqGAN
 
+## What's New
+
++ Modify code to use own data
++ Save Gan after training
++ BLEU metrics
++ BLEU score for synthetic data: 0.9628578235478364
+
+
+
 ## Requirements: 
+
 * **Tensorflow r1.0.1**
 * Python 2.7
 * CUDA 7.5+ (For GPU)
