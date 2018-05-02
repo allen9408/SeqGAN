@@ -1,0 +1,2 @@
+model_checkpoint_path: "intubation.ckpt"
+all_model_checkpoint_paths: "intubation.ckpt"

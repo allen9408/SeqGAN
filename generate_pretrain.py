@@ -46,7 +46,7 @@ positive_file = 'save/intubation_idx.txt'
 negative_file = 'save/generator_sample.txt'
 eval_file = 'save/eval_file.txt'
 # generated_num = 10000
-generated_num = 100
+generated_num = 1000
 
 def generate_samples(sess, trainable_model, batch_size, generated_num, output_file):
     # Generate Samples
@@ -117,93 +117,22 @@ def main():
     config = tf.ConfigProto()
     # config.gpu_options.allow_growth = True
     sess = tf.Session(config=config)
-    sess.run(tf.global_variables_initializer())
-    gen_data_loader.create_batches(positive_file)
+    # sess.run(tf.global_variables_initializer())
+    # gen_data_loader.create_batches(positive_file)
 
-    print("Pre-train target lstm")
-    # for i in range(100):
-    for i in range(10):
-        loss = pre_train_epoch(sess, target_lstm, gen_data_loader)
-        print(i, 'th epoch, pretrain_loss = ', loss)
-
-    # First, use the oracle model to provide the positive examples, which are sampled from the oracle data distribution
-    # generate_samples(sess, target_lstm, BATCH_SIZE, generated_num, positive_file)
-    gen_data_loader.create_batches(positive_file)
-    log = open('save/experiment-log.txt', 'w')
-    #  pre-train generator
-    print('Start pre-training...')
-    log.write('pre-training...\n')
-    for epoch in range(PRE_EPOCH_NUM):
-        loss = pre_train_epoch(sess, generator, gen_data_loader)
-        if epoch % 5 == 0:
-            generate_samples(sess, generator, BATCH_SIZE, generated_num, eval_file)
-            likelihood_data_loader.create_batches(eval_file)
-            test_loss = target_loss(sess, target_lstm, likelihood_data_loader)
-            print('pre-train epoch ', epoch, 'test_loss ', test_loss)
-            buffer = 'epoch:\t'+ str(epoch) + '\tnll:\t' + str(test_loss) + '\n'
-            log.write(buffer)
-
-    print('Start pre-training discriminator...')
-    # Train 3 epoch on the generated data and do this for 50 times
-    # for _ in range(50):
-    for _ in range(10):
-        generate_samples(sess, generator, BATCH_SIZE, generated_num, negative_file)
-        dis_data_loader.load_train_data(positive_file, negative_file)
-        for _ in range(3):
-            dis_data_loader.reset_pointer()
-            for it in range(dis_data_loader.num_batch):
-                x_batch, y_batch = dis_data_loader.next_batch()
-                feed = {discriminator.input_x: x_batch,discriminator.input_y: y_batch,discriminator.dropout_keep_prob: dis_dropout_keep_prob}
-                _ = sess.run(discriminator.train_op, feed)
 
     rollout = ROLLOUT(generator, 0.8)
+    saver = tf.train.Saver()
+    saver.restore(sess, 'models/intubation.ckpt')
+
     
-    print('#########################################################################')
-    print('Start Adversarial Training...')
-    log.write('adversarial training...\n')
-    for total_batch in range(TOTAL_BATCH):
-        # Train the generator for one step
-        for it in range(1):
-            samples = generator.generate(sess)
-            rewards = rollout.get_reward(sess, samples, 16, discriminator)
-            feed = {generator.x: samples, generator.rewards: rewards}
-            _ = sess.run(generator.g_updates, feed_dict=feed)
-
-        # Test
-        if total_batch % 2 == 0 or total_batch == TOTAL_BATCH - 1:
-            generate_samples(sess, generator, BATCH_SIZE, generated_num, eval_file)
-            likelihood_data_loader.create_batches(eval_file)
-            test_loss = target_loss(sess, target_lstm, likelihood_data_loader)
-            buffer = 'epoch:\t' + str(total_batch) + '\tnll:\t' + str(test_loss) + '\n'
-            print('total_batch: ', total_batch, 'test_loss: ', test_loss)
-            log.write(buffer)
-
-        # Update roll-out parameters
-        rollout.update_params()
-
-        # Train the discriminator
-        for _ in range(5):
-            generate_samples(sess, generator, BATCH_SIZE, generated_num, negative_file)
-            dis_data_loader.load_train_data(positive_file, negative_file)
-
-            for _ in range(3):
-                dis_data_loader.reset_pointer()
-                for it in range(dis_data_loader.num_batch):
-                    x_batch, y_batch = dis_data_loader.next_batch()
-                    feed = {
-                        discriminator.input_x: x_batch,
-                        discriminator.input_y: y_batch,
-                        discriminator.dropout_keep_prob: dis_dropout_keep_prob
-                    }
-                    _ = sess.run(discriminator.train_op, feed)
-
-    log.close()
+   
     # generate sequences
     generate_samples(sess, generator, BATCH_SIZE, generated_num, 'save/Generate.txt')
 
     # save models
-    saver = tf.train.Saver()
-    saver.save(sess, 'models/intubation.ckpt')
+    # saver = tf.train.Saver()
+    # saver.save(sess, 'models/intubation.ckpt')
 
 if __name__ == '__main__':
     main()
