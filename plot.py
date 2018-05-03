@@ -5,20 +5,34 @@ import pdb
 import numpy as np
 import matplotlib.patches as mpatches
 import math
-
+import pickle as pkl
 
 # original file 
 trace_len_ori = []
 trace_len_gen = []
 
+act_num_ori = [0 for i in range(16)]
+act_num_gen = [0 for i in range(16)]
+
+act_dict = pkl.load(open("save/word_d.pkl", "rb"))
+# pdb.set_trace()
+acts_ori = ['start']
+word_dict = {}
+for k,v in act_dict.items():
+    word_dict[v] = k
+for i in range(1, 16):
+    acts_ori.append(word_dict[i])
 with open('save/intubation_idx.txt', 'r') as f:
     for line in f:
         seq = line.split(' ')
         i = 0
         for a in seq:
-            if a == '16':
+            if int(a) == 16:
                 break
             i += 1
+            idx = int(a)
+            # print(a, idx)
+            act_num_ori[idx] += 1
         trace_len_ori.append(i)
 
 with open('save/Generate.txt', 'r') as f:
@@ -26,10 +40,16 @@ with open('save/Generate.txt', 'r') as f:
         seq = line.split(' ')
         i = 0
         for a in seq:
-            if a == '16':
+            if int(a) == 16:
                 break
             i += 1
+            idx = int(a)
+            act_num_gen[idx] += 1
         trace_len_gen.append(i)
+
+for i in range(len(act_num_ori)):
+    act_num_ori[i] = act_num_ori[i]/len(trace_len_ori) * 100
+    act_num_gen[i] = act_num_gen[i]/len(trace_len_gen) * 100
 
 ori_nd = np.array(trace_len_ori)
 gen_nd = np.array(trace_len_gen)
@@ -46,19 +66,16 @@ plt.legend(loc='upper right')
 plt.savefig('trace_len_dist.png', dpi = 300)
 plt.close()
 
-'''
+
 ##########################################################################################################
 # get activity occurrence distribution
-acts_ori = df_original['category'].drop_duplicates().tolist()
-act_num_ori = []
-act_num_gen = []
+# acts_ori = df_original['category'].drop_duplicates().tolist()
+
 colors_ori = []
 colors_gen = []
-for act_o in acts_ori:
-    ori_num = df_original[df_original.category == act_o].shape[0]/len(ids_ori)*100
-    gen_num = df_generate[df_generate.Activity == act_o].shape[0]/len(ids_gen)*100
-    act_num_ori.append(ori_num)
-    act_num_gen.append(gen_num)
+for i in range(len(acts_ori)):
+    ori_num = act_num_ori[i]
+    gen_num = act_num_gen[i]
     if ori_num > gen_num:
         colors_ori.append('g')
         colors_gen.append('r')
@@ -75,29 +92,35 @@ act_num_ori = df_act['ori_num'].tolist()
 act_num_gen = df_act['gen_num'].tolist()
 colors_ori = df_act['colors_ori']
 colors_gen = df_act['colors_gen']
+diff = df_act['diff'].tolist()
 max_an = max(act_num_gen+act_num_ori)
 t = range(len(acts_ori))
 fig, axes = plt.subplots(ncols=2, sharey=True)
 axes[0].barh(t, act_num_ori, align='center', color=colors_ori)
 axes[1].barh(t, act_num_gen, align='center', color=colors_gen)
+axes[0].set_xlim([0, max_an + 30])
+axes[1].set_xlim([0, max_an + 30])
 idx = 0
 for i, v in enumerate(act_num_ori):
-    axes[0].text(v + 9, i, '{:.1f}'.format(diff[idx]), color='black', fontsize=2,verticalalignment='center')
+    axes[0].text(v + 25, i, '{:.1f}'.format(diff[idx]), color='black', fontsize=6,verticalalignment='center')
     idx+=1;
 idx = 0
 for i, v in enumerate(act_num_gen):
-    axes[1].text(v + 3, i, '{:.1f}'.format(-diff[idx]), color='black', fontsize=2,verticalalignment='center')
+    axes[1].text(v + 2, i, '{:.1f}'.format(-diff[idx]), color='black', fontsize=6,verticalalignment='center')
     idx += 1
 axes[0].invert_xaxis()
 axes[0].set(yticks=t, yticklabels=acts_ori)
-axes[0].tick_params(labelsize=2)
-axes[1].tick_params(labelsize=2)
+axes[0].tick_params(labelsize=6)
+axes[1].tick_params(labelsize=6)
 axes[0].yaxis.tick_right()
+
 # fig.tight_layout()
-fig.subplots_adjust(wspace=0.3)
+fig.subplots_adjust(wspace=0.8)
 # plt.show()
-plt.savefig('act_dist.png',dpi = 600)
+plt.savefig('act_dist.png',dpi = 300)
 plt.close()
+
+'''
 ##########################################################################################################
 # plot patient distribution
 df_patient_ori = pd.read_csv('attributes.csv')

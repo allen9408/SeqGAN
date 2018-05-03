@@ -16,6 +16,6 @@ with open(seqgan_file, 'r') as f:
     seqs_from_gan.append(line.split(' '))
 
 from nltk.translate.bleu_score import sentence_bleu
-scores = [sentence_bleu(references, s) for s in seqs_from_gan]
+scores = [sentence_bleu(references, s, weights=(0,1,0,0)) for s in seqs_from_gan]
 # score = sentence_bleu(references, seqs_from_gan)
 print(sum(scores)/len(scores))
